@@ -1,4 +1,6 @@
-from models.problem1 import LastMile, _saveModel
+from models.problem1 import LastMile
+from utils.plot import _plotLastMile
+from utils.save import _saveLastMile
 import argparse
 
 def read_block(file):
@@ -52,7 +54,7 @@ def get_output(filename, output_name):
             model, x, y = LastMile(I, J, c, S, k, a)
 
             # save
-            _saveModel(model, x, y, output_name, case_idx, I, J)
+            _saveLastMile(model, x, y, output_name, case_idx, I, J)
             case_idx += 1
 
 def main():

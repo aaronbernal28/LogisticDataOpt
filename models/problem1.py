@@ -59,27 +59,3 @@ def LastMile(I, J, c, S, k, a):
     model.optimize()
 
     return model, x, y
-
-def _saveModel(model, x, y, filename, case_idx, I, J):
-    '''
-    model : pySCIPopt LastMile model object
-    x : decision variables for nodes to packages
-    y : decision variables for SC
-    filename : output file name
-    case_idx : index of the actual case
-    '''
-    mode = 'a'
-    if case_idx == 1:
-        mode = 'w'
-    
-    with open(filename, mode) as f:
-        print('Caso ' + str(case_idx), file=f)
-        print(model.getObjVal(), file=f)
-
-        for j in J:
-            for i in I:
-                if model.getVal(x[i, j]) == 1:
-                    print(j, i, file=f)
-
-            if model.getVal(y[j]) == 1:
-                print(j, -1, file=f)
