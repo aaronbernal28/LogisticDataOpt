@@ -14,7 +14,7 @@ def _saveLastMile(model, x, y, filename, case_idx, I, J):
     
     with open(filename, mode) as f:
         print('Caso ' + str(case_idx), file=f)
-        print(model.getObjVal(), file=f)
+        print(round(model.getObjVal(), 2), file=f)
 
         for j in J:
             for i in I:
