@@ -40,22 +40,46 @@ def LastMile(I, J, c, S, k, a):
 
     # constrains
 
-    ## cond 1
+    ## cobertura
     for i in I:
         for j in J:
-            model.addCons(y[j] <= x[i, j] <= a[i,j])
+            model.addCons(x[i, j] <= a[i][j])
 
-    ## cons 2
+    ## capacidad
     for i in I:
         model.addCons(quicksum(x[i,j] for j in J) <= k[i])
 
     ## cons 3
-    model.addCons(quicksum((quicksum(x[i,j] for j in J)) for i in I) == M)
-
-    ## cons 4
     for j in J:
-        model.addCons(quicksum(x[i,j] for i in I) <= 1)
+        model.addCons(quicksum(x[i,j] for i in I) + y[j] == 1)
     
+    ## cons 4
+    model.addCons(quicksum(quicksum(x[i,j] for i in I) + y[j] for j in J) == M)
+
     model.optimize()
 
     return model, x, y
+
+def _saveModel(model, x, y, filename, case_idx, I, J):
+    '''
+    model : pySCIPopt LastMile model object
+    x : decision variables for nodes to packages
+    y : decision variables for SC
+    filename : output file name
+    case_idx : index of the actual case
+    '''
+    mode = 'a'
+    if case_idx == 1:
+        mode = 'w'
+    
+    with open(filename, mode) as f:
+        print('Caso ' + str(case_idx), file=f)
+        print(model.getObjVal(), file=f)
+
+        for j in J:
+            for i in I:
+                if model.getVal(x[i, j]) == 1:
+                    print(j, i, file=f)
+
+            if model.getVal(y[j]) == 1:
+                print(j, -1, file=f)

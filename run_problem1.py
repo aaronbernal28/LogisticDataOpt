@@ -1,38 +1,66 @@
-from models.problem1 import LastMile
+from models.problem1 import LastMile, _saveModel
 import argparse
 
-def read_data(filename):
-    # ?
-    with open(filename, 'r') as file:
-        '''
-        readline() reads a single line from the file
-        strip() removes leading and trailing whitespace
-        split() splits the string into a list where each word is a list item
-        '''
-        N, M = list(map(int, file.readline().strip().split()))
+def read_block(file):
+    '''
+    readline() reads a single line from the file
+    strip() removes leading and trailing whitespace
+    split() splits the string into a list where each word is a list item
+    '''
+    N, M = list(map(int, file.readline().split()))
+
+    if N == M == 0:
+        # end of input, break while
+        return None
+
+    S = list(map(float, file.readline().split()))[0]
+
+    I = list(range(N))
+    J = list(range(M))
+
+    k = []
+    c = []
         
+    for _ in I:
+        capacidad, costo = list(map(float, file.readline().split()))
+        k.append(int(capacidad))
+        c.append(costo)
+        
+    a = [[0]*M for _ in range(N)]
+
+    for i in I:
+        input = list(map(int, file.readline().split()))
+        for j in input[1:]:
+            a[i][j] = 1
+
     return I, J, c, S, k, a
+
+def get_output(filename, output_name):
+    with open(filename, 'r') as file:
+        case_idx = 1
+
+        # read each block
+        while True:
+            block = read_block(file)
+            if block is None:
+                break
+
+            print(f"Processing case {case_idx}")
+
+            # run model
+            I, J, c, S, k, a = block
+            model, x, y = LastMile(I, J, c, S, k, a)
+
+            # save
+            _saveModel(model, x, y, output_name, case_idx, I, J)
+            case_idx += 1
 
 def main():
     parser = argparse.ArgumentParser(description="Run Problem1 Model")
-    parser.add_argument('filename.in')
+    parser.add_argument('filename')
     args = parser.parse_args()
 
-    I, J, c, S, k, a = read_data(args.filename)
-
-    model, x, y = LastMile(I, J, c, S, k, a)
-
-    if model.getStatus() == "optimal":
-        print("Optimal solution found:")
-        for i in I:
-            for j in J:
-                if model.getVal(x[i, j]) > 0.5:
-                    print(f"Package {j} delivered from node {i}")
-        for j in J:
-            if model.getVal(y[j]) > 0.5:
-                print(f"Package {j} delivered from Service Center")
-    else:
-        print("No optimal solution found.")
+    get_output(args.filename, output_name = args.filename.split('.')[0] + '.out')
 
 if __name__ == "__main__":
     main()
