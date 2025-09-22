@@ -60,9 +60,10 @@ def get_output(filename, output_name):
 def main():
     parser = argparse.ArgumentParser(description="Run Problem1 Model")
     parser.add_argument('filename')
+    parser.add_argument('output_name')
     args = parser.parse_args()
 
-    get_output(args.filename, output_name = args.filename.split('.')[0] + '.out')
+    get_output(args.filename, output_name = args.output_name)
 
 if __name__ == "__main__":
     main()

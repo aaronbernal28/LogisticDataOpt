@@ -23,3 +23,7 @@ def _saveLastMile(model, x, y, filename, case_idx, I, J):
 
             if model.getVal(y[j]) == 1:
                 print(j, -1, file=f)
+        print('', file=f)
+
+def save_routing(problem2_output, output_name, case_idx):
+    pass
