@@ -1,6 +1,6 @@
 import argparse
 from run_problem1 import read_block as read_block_asignacion
-from models.problem2 import Routing as model2_routing
+from models.problem2 import Routing_naive as model2_routing
 from utils.save import save_routing
 import numpy as np
 
@@ -14,7 +14,7 @@ def read_block_routing(file, N, M):
     for coord, n in zip([coord_I, coord_J], [N+1, M]):
         for _ in range(n):
             id, x, y = list(map(float, file.readline().split()))
-            coord[id] = np.array([x, y])
+            coord[int(id), :] = [x, y]
 
     return capacidad, costo_fijo, costo_variable, coord_I, coord_J
 
