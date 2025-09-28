@@ -2,11 +2,37 @@ from problem1 import LastMile as asignacion
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 import numpy as np
 
-def Routing_naive(block1, block2):
-    '''Procesa un input case'''
-    I, J, c, S, k, a = block1
+def Routing_naive(block1, block2, time_limit_per_routing=5):
+    '''
+    Procesa un input case y resuelve el routing para cada origen con paquetes asignados
+    
+    Parameters
+    ----------
+    block1 : tuple
+        Tupla con (I, J, c, S, k, a) donde:
+            I: array_like - Nodos de origen
+            J: array_like - Paquetes  
+            c: array_like - Costos por nodo
+            S: float - Costo por SVC
+            k: array_like - Capacidad maxima por nodo
+            a: ndarray - Cobertura IxJ (nodo -> paquete)
+    block2 : tuple
+        Tupla con (capacidad, costo_fijo, costo_variable, coord_I, coord_J) donde:
+            capacidad: int - Capacidad de vehiculos
+            costo_fijo: float - Costo fijo por vehiculo
+            costo_variable: float - Costo variable por vehiculo
+            coord_I: ndarray - Coordenadas de nodos origen
+            coord_J: ndarray - Coordenadas de paquetes
+    time_limit_per_routing : int
+
+    Returns
+    -------
+    information_routing : dict
+        Diccionario con informacion de rutas por origen, paquetes y modelo
+    '''
+    I, J, _, _, _, _ = block1
     capacidad, costo_fijo, costo_variable, coord_I, coord_J = block2
-    model1, x, y = asignacion(I, J, c, S, k, a)
+    model1, x, y = asignacion(*block1)
 
     # Extraer asignaciones del modelo
     asignaciones = {i: [] for i in range(-1, len(I))}
@@ -19,9 +45,7 @@ def Routing_naive(block1, block2):
 
     information_routing = {
         'rutas_por_origen': {},
-        'nodes': I,
-        'packages': J,
-        'model1': model1
+        'packages': J
     }
 
     # Procesar routing para cada origen con paquetes asignados
@@ -29,7 +53,7 @@ def Routing_naive(block1, block2):
         if not paquetes_asignados:
             continue
             
-        # Mostrar información del origen
+        # Mostrar informaciÃ³n del origen
         if origen_id == -1:
             print(f'\n--- SVC routing ---')
         else:
@@ -38,14 +62,13 @@ def Routing_naive(block1, block2):
         
         num_paquetes = len(paquetes_asignados)
         data = {
-            # Variables de los vehículos
+            # Variables de los vehÃ­culos
             'num_vehicles': num_paquetes,
             'vehicle_capacities': [capacidad] * num_paquetes,
             'vehicle_costs_fixed': [costo_fijo] * num_paquetes,
             'vehicle_costs_variable': [costo_variable] * num_paquetes,
             
             'depot': num_paquetes,  # Index del origen en la distance_matrix
-            'origen_id': origen_id,      # Index original
             'paquetes': paquetes_asignados
         }
 
@@ -56,16 +79,40 @@ def Routing_naive(block1, block2):
         # Demanda (paquetes=1, depot=0)
         data['demands'] = [1] * num_paquetes + [0]
 
-        manager, routing, solution = run_routing(data)
+        manager, routing, solution = run_routing(data, time_limit_per_routing)
 
         # Guardo todo para ser procesado aparte
         information_routing['rutas_por_origen'][origen_id] = [data, manager, routing, solution]
     
+    information_routing['costo_total'] = total_cost(information_routing, model1)
     return information_routing
 
-def run_routing(data):
+def run_routing(data, time_limit_per_routing=5):
     '''
-    Resuelve el ruteo para un origen y un conj de paquetes
+    Resuelve el ruteo para un origen y un conjunto de paquetes usando OR-Tools
+    
+    Parameters
+    ----------
+    data : dict
+        Diccionario con datos del problema de routing:
+        - distance_matrix: matriz de distancias
+        - num_vehicles: numero de vehiculos  
+        - vehicle_capacities: capacidades de vehiculos
+        - vehicle_costs_fixed: costos fijos por vehiculo
+        - depot: indice del deposito/origen
+        - demands: demandas por paquetes
+        
+    Returns
+    -------
+    manager : pywrapcp.RoutingIndexManager
+        Gestor de indices de routing
+    routing : pywrapcp.RoutingModel  
+        Modelo de routing
+    solution : pywrapcp.Assignment
+        Solucion encontrada
+        
+    Notes
+    -----
     Source: https://developers.google.com/optimization/routing/cvrp 
     '''
     # Create the routing index manager
@@ -121,12 +168,68 @@ def run_routing(data):
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     )
-    search_parameters.time_limit.FromSeconds(10)
+    search_parameters.time_limit.FromSeconds(time_limit_per_routing)
 
     # Solve the problem.
     solution = routing.SolveWithParameters(search_parameters)
     
     return manager, routing, solution
+
+def total_cost(information_routing, model1):
+    '''
+    Parameters
+    ----------
+    information_routing : 
+
+    Returns
+    -------
+    costo_total : Float
+    '''
+    costo_model1 = model1.getObjVal()
+    
+    # Calcula el costo total del routing (model2)
+    costo_model2 = 0
+    for origen_id, (data, manager, routing, solution) in information_routing['rutas_por_origen'].items():
+        if solution:
+            costo_model2 += solution.ObjectiveValue()
+    
+    # Costo variable por paquete
+    num_packages = len(information_routing['packages'])
+    # Asumir costo_variable desde el primer data disponible
+    costo_variable = 0
+    if information_routing['rutas_por_origen']:
+        first_data = next(iter(information_routing['rutas_por_origen'].values()))[0]
+        costo_variable = first_data['vehicle_costs_variable'][0]
+    
+    # Costo total: costo(model1) + costo(model2)/100 + len(J) * costo_variable
+    costo_total = costo_model1 + (costo_model2 / 100) + (num_packages * costo_variable)
+    return costo_total
+
+def routing_random(block1, block2, time_limit_per_routing, p, seed=28):
+    '''
+    Apaga algunos alcances de forma random y resuelve el routing
+    
+    Parameters
+    ----------
+    block1 : tuple
+        Tupla con (I, J, c, S, k, a)
+    block2 : tuple
+        Tupla con (capacidad, costo_fijo, costo_variable, coord_I, coord_J)
+    time_limit_per_routing : int
+    p : float
+        Entre 0, 1
+    Returns
+    -------
+    information_routing : dict
+        Diccionario con informacion de rutas por origen
+    '''
+    I, J, c, S, k, a = block1
+    np.random.seed(seed)
+    mask = np.random.binomial(n=1, p=p, size=a.shape)
+    a = a * mask
+
+    block1 = I, J, c, S, k, a
+    return Routing_naive(block1, block2, time_limit_per_routing)
 
 if __name__ == "__main__":
     coords = np.array([[0, 0], [1, 2], [2, 1], [3, 3]])

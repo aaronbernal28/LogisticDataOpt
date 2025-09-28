@@ -2,19 +2,26 @@ from pyscipopt import Model, quicksum
 
 def LastMile(I, J, c, S, k, a):
     '''
-    Input
+    Parameters
     -------
-    I: Conjunto de todos los nodos de entrega disponibles.
-    J: Conjunto de todos los paquetes que deben ser entregados.
-
-    c[i]: Costo fijo por entregar un paquete desde el nodo i.
-    S: Costo promedio por entregar un paquete desde el Service Center.
-    k[i]: Capacidad máxima (en número de paquetes) del nodo i.
-    a[i,j]: es 1 si y solo si el nodo i puede entregar el paquete j
+    I : array_like
+        Nodos
+    J : array_like
+        Paquetes
+    c : array_like
+        Costos por nodo
+    S : Float
+        Costo por SVC
+    k : array_like
+        Capacidad maxima por nodo
+    a : ndarray
+        Cobertura IxJ (nodo -> paquete)
 
     Returns
     -------
-    pySCIPopt model object
+    model : pySCIPopt model object
+    x : dict pySCIPopt
+    y : dict pySCIPopt
     '''
     M = len(J)
     
@@ -43,7 +50,7 @@ def LastMile(I, J, c, S, k, a):
     ## cobertura
     for i in I:
         for j in J:
-            model.addCons(x[i, j] <= a[i][j])
+            model.addCons(x[i, j] <= a[i, j])
 
     ## capacidad
     for i in I:

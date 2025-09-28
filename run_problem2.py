@@ -1,11 +1,35 @@
 import argparse
 from run_problem1 import read_block as read_block_asignacion
-from models.problem2 import Routing_naive as model2_routing
+from models.problem2 import Routing_naive as model2_routing, routing_random
 from utils.save import save_routing
 import numpy as np
 
 def read_block_routing(file, N, M):
-    ''' Reads a block for the routing problem from the given file. SVC is the node -1'''
+    '''
+    Lee un bloque para el problema de routing desde el archivo dado
+    
+    Parameters
+    ----------
+    file : file object
+        Archivo abierto para lectura
+    N : int
+        Numero de nodos de origen
+    M : int
+        Numero de paquetes
+        
+    Returns
+    -------
+    capacidad : int
+        Capacidad de los vehiculos
+    costo_fijo : float
+        Costo fijo por vehiculo
+    costo_variable : float
+        Costo variable por vehiculo
+    coord_I : ndarray
+        Coordenadas de nodos origen (N+1 x 2), SVC es el nodo -1
+    coord_J : ndarray
+        Coordenadas de paquetes (M x 2)
+    '''
     capacidad = list(map(int, file.readline().split()))[0]
     costo_fijo, costo_variable = list(map(float, file.readline().split()))
 
@@ -19,6 +43,16 @@ def read_block_routing(file, N, M):
     return capacidad, costo_fijo, costo_variable, coord_I, coord_J
 
 def get_output(filename, output_name):
+    '''
+    Procesa todos los casos del archivo de entrada y genera los resultados
+    
+    Parameters
+    ----------
+    filename : str
+        Nombre del archivo de entrada
+    output_name : str
+        Nombre del archivo de salida
+    '''
     with open(filename, 'r') as file:
         case_idx = 1
 
@@ -36,9 +70,19 @@ def get_output(filename, output_name):
 
             # run models
             problem2_output = model2_routing(block1, block2)
-
+            print(f"Costo original = {problem2_output['costo_total']}")
             # save
             save_routing(problem2_output, output_name, case_idx)
+
+            time_limit_per_routing = 1
+            results = []
+            for i in range(5):
+                for p in np.linspace(0.1, 0.9, 5):
+                    problem2_output = routing_random(block1, block2, time_limit_per_routing, p, seed=i)
+                    results.append(f"Random routing (seed={i}, p={p:.2f}): costo = {problem2_output['costo_total']}")
+            for res in results:
+                print(res)
+
             case_idx += 1
 
 def main():
