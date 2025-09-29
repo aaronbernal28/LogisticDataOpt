@@ -1,4 +1,4 @@
-from models.problem1 import LastMile
+from models.problem1 import asignacion
 from utils.plot import _plotLastMile
 from utils.save import saveLastMile
 import argparse
@@ -82,7 +82,7 @@ def get_output(filename, output_name):
 
             # run model
             I, J, c, S, k, a = block
-            model, x, y = LastMile(I, J, c, S, k, a)
+            model, x, y = asignacion(I, J, c, S, k, a)
 
             # save
             saveLastMile(model, x, y, output_name, case_idx, I, J)

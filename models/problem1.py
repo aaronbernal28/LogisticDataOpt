@@ -1,6 +1,6 @@
 from pyscipopt import Model, quicksum
 
-def LastMile(I, J, c, S, k, a):
+def asignacion(I, J, c, S, k, a, capacidad_maxima = None):
     '''
     Parameters
     -------
@@ -24,7 +24,10 @@ def LastMile(I, J, c, S, k, a):
     y : dict pySCIPopt
     '''
     M = len(J)
-    
+
+    if capacidad_maxima is not None:
+        k = [min(ki, capacidad_maxima) for ki in k]
+        
     # initialice model
     model = Model("Problema_1")
 

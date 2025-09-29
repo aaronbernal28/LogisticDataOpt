@@ -1,8 +1,8 @@
-from problem1 import LastMile as asignacion
+from models.problem1 import asignacion
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 import numpy as np
 
-def Routing_naive(block1, block2, time_limit_per_routing=5):
+def Routing_naive(block1, block2, time_limit_per_routing, hardcodear_capacity=False):
     '''
     Procesa un input case y resuelve el routing para cada origen con paquetes asignados
     
@@ -23,7 +23,7 @@ def Routing_naive(block1, block2, time_limit_per_routing=5):
             costo_variable: float - Costo variable por vehiculo
             coord_I: ndarray - Coordenadas de nodos origen
             coord_J: ndarray - Coordenadas de paquetes
-    time_limit_per_routing : int
+    hard_code_capacity : bool
 
     Returns
     -------
@@ -32,7 +32,7 @@ def Routing_naive(block1, block2, time_limit_per_routing=5):
     '''
     I, J, _, _, _, _ = block1
     capacidad, costo_fijo, costo_variable, coord_I, coord_J = block2
-    model1, x, y = asignacion(*block1)
+    model1, x, y = asignacion(*block1, capacidad if hardcodear_capacity else None)
 
     # Extraer asignaciones del modelo
     asignaciones = {i: [] for i in range(-1, len(I))}
@@ -87,7 +87,7 @@ def Routing_naive(block1, block2, time_limit_per_routing=5):
     information_routing['costo_total'] = total_cost(information_routing, model1)
     return information_routing
 
-def run_routing(data, time_limit_per_routing=5):
+def run_routing(data, time_limit_per_routing=1):
     '''
     Resuelve el ruteo para un origen y un conjunto de paquetes usando OR-Tools
     
@@ -113,7 +113,8 @@ def run_routing(data, time_limit_per_routing=5):
         
     Notes
     -----
-    Source: https://developers.google.com/optimization/routing/cvrp 
+    Source: https://developers.google.com/optimization/routing/cvrp
+    Como la distancia total no afecta la funcion de perdida, alcanza con un time_limit_per_routing chico
     '''
     # Create the routing index manager
     manager = pywrapcp.RoutingIndexManager(
@@ -168,7 +169,7 @@ def run_routing(data, time_limit_per_routing=5):
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     )
-    search_parameters.time_limit.FromSeconds(time_limit_per_routing)
+    search_parameters.time_limit.FromMilliseconds(int(time_limit_per_routing * 1000))
 
     # Solve the problem.
     solution = routing.SolveWithParameters(search_parameters)
@@ -189,7 +190,7 @@ def total_cost(information_routing, model1):
     
     # Calcula el costo total del routing (model2)
     costo_model2 = 0
-    for origen_id, (data, manager, routing, solution) in information_routing['rutas_por_origen'].items():
+    for _, (_, _, _, solution) in information_routing['rutas_por_origen'].items():
         if solution:
             costo_model2 += solution.ObjectiveValue()
     
@@ -215,7 +216,6 @@ def routing_random(block1, block2, time_limit_per_routing, p, seed=28):
         Tupla con (I, J, c, S, k, a)
     block2 : tuple
         Tupla con (capacidad, costo_fijo, costo_variable, coord_I, coord_J)
-    time_limit_per_routing : int
     p : float
         Entre 0, 1
     Returns
@@ -230,6 +230,74 @@ def routing_random(block1, block2, time_limit_per_routing, p, seed=28):
 
     block1 = I, J, c, S, k, a
     return Routing_naive(block1, block2, time_limit_per_routing)
+
+def re_routing(block1, block2, initial_solution, time_limit_per_routing, seed=28):
+    '''Redistribuye las asignaciones para que cada nodo tenga lo mas cerca a (mod capacidad) paquetes
+    
+    Parameters
+    ----------
+    block1 : tuple
+        Tupla con (I, J, c, S, k, a)
+    block2 : tuple
+        Tupla con (capacidad, costo_fijo, costo_variable, coord_I, coord_J)
+    initial_solution : dict
+        Solucion inicial de Routing_naive
+        
+    Returns
+    -------
+    information_routing : dict
+    '''
+    np.random.seed(seed)
+
+    I, J, c, S, k, a_original = block1
+    capacidad, _, _, _, _ = block2
+    
+    # Copiar matriz de cobertura actual
+    a_modified = a_original.copy()
+    
+    # Calcular cuantos paquetes tiene cada nodo en la solucion actual
+    asignaciones_actuales = {i: 0 for i in I}
+    for origen_id in initial_solution['rutas_por_origen'].keys():
+        if origen_id != -1:
+            data = initial_solution['rutas_por_origen'][origen_id][0]
+            asignaciones_actuales[origen_id] = len(data['paquetes'])
+    
+    # Identificar nodos que necesitan ajuste (no son multiplos de capacidad)
+    nodos_desbalanceados = []
+    for i in I:
+        num_paquetes = asignaciones_actuales.get(i, 0)
+        if num_paquetes > 0:
+            resto = num_paquetes % capacidad
+            if resto != 0:
+                # Peso mayor si esta mas lejos del multiplo
+                peso = min(resto, capacidad - resto)**2
+                nodos_desbalanceados.append((i, peso))
+    
+    if len(nodos_desbalanceados) == 0:
+        print('No hay nodos desbalanceados, retornando solucion inicial')
+        return initial_solution
+        
+    # Seleccionar algunos nodos para modificar sus conexiones
+    num_modificaciones = np.random.randint(1, len(nodos_desbalanceados) + 1)
+    nodos_a_modificar = np.random.choice(
+        [n[0] for n in nodos_desbalanceados],
+        size=min(num_modificaciones, len(nodos_desbalanceados)),
+        replace=False
+    )
+    
+    # Para cada nodo seleccionado, apagar algunas conexiones aleatorias
+    for nodo in nodos_a_modificar:
+        conexiones_activas = np.where(a_modified[nodo, :] == 1)[0]
+        if len(conexiones_activas) > 0:
+            # Apagar entre 1 y 3 conexiones
+            num_apagar = min(np.random.randint(1, 4), len(conexiones_activas))
+            indices_apagar = np.random.choice(conexiones_activas, size=num_apagar, replace=False)
+            a_modified[nodo, indices_apagar] = 0
+    
+    # Resolver con la matriz modificada
+    block1_modified = (I, J, c, S, k, a_modified)
+    
+    return Routing_naive(block1_modified, block2, time_limit_per_routing)
 
 if __name__ == "__main__":
     coords = np.array([[0, 0], [1, 2], [2, 1], [3, 3]])
